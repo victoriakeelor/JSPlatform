@@ -18,15 +18,17 @@ function Level(plan) {
       // If the character is ' ', assign null.
 
       var ch = line[x], fieldType = null;
-      // Use if and else to handle the three cases
-      if (ch==='@')
-        // Create a new player at that grid position.
-        this.player = new Player(new Vector(x, y));
-      else if (ch == "x")
+
+      // Use if and else to handle the two cases
+      if (ch == "@")
+		  this.player = new Player(new Vector(x,y));
+	  else if (ch == "x")
         fieldType = "wall";
       // Because there is a third case (space ' '), use an "else if" instead of "else"
       else if (ch == "!")
         fieldType = "lava";
+	  else if (ch == "y")
+		  fieldType = "floater";
 
       // "Push" the fieldType, which is a string, onto the gridLine array (at the end).
       gridLine.push(fieldType);
@@ -35,6 +37,13 @@ function Level(plan) {
     this.grid.push(gridLine);
   }
 }
+
+function Player(pos) {
+	this.pos = pos.plus(new Vector(0, -0.5));
+	this.size = new Vector(0.8, 1.5);
+	this.speed = new Vector(0,0);
+}
+Player.prototype.type = "player";
 
 function Vector(x, y) {
   this.x = x; this.y = y;
@@ -49,15 +58,6 @@ Vector.prototype.plus = function(other) {
 Vector.prototype.times = function(factor) {
   return new Vector(this.x * factor, this.y * factor);
 };
-
-
-// A Player has a size, speed and position.
-function Player(pos) {
-  this.pos = pos.plus(new Vector(0, -0.5));
-  this.size = new Vector(0.8, 1.5);
-  this.speed = new Vector(0, 0);
-}
-Player.prototype.type = "player";
 
 // Helper function to easily create an element of a type provided 
 // and assign it a class.
@@ -76,11 +76,10 @@ function DOMDisplay(parent, level) {
 
   // In this version, we only have a static background.
   this.wrap.appendChild(this.drawBackground());
-
-  // Keep track of actors
+  
+  //Track our actors
   this.actorLayer = null;
-
-  // Update the world based on player position
+  
   this.drawFrame();
 }
 
@@ -102,34 +101,32 @@ DOMDisplay.prototype.drawBackground = function() {
   return table;
 };
 
-// Draw the player agent
 DOMDisplay.prototype.drawPlayer = function() {
-  // Create a new container div for actor dom elements
-  var wrap = elt("div");
-
-  var actor = this.level.player;
-  var rect = wrap.appendChild(elt("div",
-                                    "actor " + actor.type));
-  rect.style.width = actor.size.x * scale + "px";
-  rect.style.height = actor.size.y * scale + "px";
-  rect.style.left = actor.pos.x * scale + "px";
-  rect.style.top = actor.pos.y * scale + "px";
-  return wrap;
-};
+	var wrap = elt("div");
+	var actor = this.level.player;
+	var rect = wrap.appendChild(elt("div","actor"+ actor.type));
+	rect.style.width = actor.size.x * scale + "px";
+	rect.style.height = actor.size.y * scale + "px";
+	rect.style.left = actor.pos.x * scale + "px";
+	rect.style.top = actor.pos.y * scale + "px";
+	
+	return wrap;
+	
+}
 
 DOMDisplay.prototype.drawFrame = function() {
-  if (this.actorLayer)
-    this.wrap.removeChild(this.actorLayer);
-  this.actorLayer = this.wrap.appendChild(this.drawPlayer());
-  this.scrollPlayerIntoView();
+	if(this.actorLayer)
+		this.wrap.removeChild(this.actorLayer);
+	this.actorLayer = this.wrap.appendChild(this.drawPlayer());
+	this.scrollPlayerIntoView();
 };
 
-DOMDisplay.prototype.scrollPlayerIntoView = function() {
+
+// Scrolls the viewport by using arrow keys
+DOMDisplay.prototype.scrollPlayerIntoView = function(keys, step) {
+  // Adding in arrow keys to scroll across level
   var width = this.wrap.clientWidth;
   var height = this.wrap.clientHeight;
-
-  // We want to keep player at least 1/3 away from side of screen
-  var margin = width / 3;
 
   // The viewport
   var left = this.wrap.scrollLeft, right = left + width;
@@ -150,135 +147,12 @@ DOMDisplay.prototype.scrollPlayerIntoView = function() {
     this.wrap.scrollTop = center.y + margin - height;
 };
 
-Level.prototype.obstacleAt = function(pos, size) {
-	var xStart = Math.floor(pos.x);
-	var xEnd = Math.ceil(pos.x + size.x);
-	var yStart = Math.floor(pos.y);
-	var yEnd = (Math.ceil(pos.y + size.y));
-	
-	if (xStart < 0 || xEnd > this.width || yStart < 0 || yEnd > this.height)
-		return 'wall';
-	if (yEnd > this.height)
-    return "lava";
-	
-	for (var y = yStart; y < yEnd; y++) {
-		for (var x = xStart; x < xEnd; x++) {
-			var fieldType = this.grid[y] [x];
-			if (fieldType) {
-				return fieldType;
-			}
-		}
-	}
-};
-
-// Collision detection for actors is handled separately from 
-// tiles. 
-Level.prototype.actorAt = function(actor) {
-  // Loop over each actor in our actors list and compare the 
-  // boundary boxes for overlaps.
-  for (var i = 0; i < this.actors.length; i++) {
-    var other = this.actors[i];
-    // if the other actor isn't the acting actor
-    if (other != actor &&
-        actor.pos.x + actor.size.x > other.pos.x &&
-        actor.pos.x < other.pos.x + other.size.x &&
-        actor.pos.y + actor.size.y > other.pos.y &&
-        actor.pos.y < other.pos.y + other.size.y)
-      // check if the boundaries overlap by comparing all sides for
-      // overlap and return the other actor if found
-      return other;
-  }
-};
-
-
-
-
-// Update simulation each step based on keys & step size
-Level.prototype.animate = function(step, keys) {
-
-  // Ensure each is maximum 100 milliseconds 
-  while (step > 0) {
-    var thisStep = Math.min(step, maxStep);
-      this.player.act(thisStep, this, keys);
-   // Do this by looping across the step size, subtracing either the
-   // step itself or 100 milliseconds
-    step -= thisStep;
-  }
-};
-
-var maxStep = 0.05;
-
-var playerXSpeed = 7;
-
-Player.prototype.moveX = function(step, level, keys) {
-  this.speed.x = 0;
-  if (keys.left) this.speed.x -= playerXSpeed;
-  if (keys.right) this.speed.x += playerXSpeed;
-
-  var motion = new Vector(this.speed.x * step, 0);
-  var newPos = this.pos.plus(motion);
-  var obstacle = level.obstacleAt(newPos, this.size);
-  if (obstacle != "wall")
-	this.pos = newPos;
-};
-
-var gravity = 70;
-var jumpSpeed = 27;
-var playerYSpeed = 10;
-
-Player.prototype.moveY = function(step, level, keys) {
-  this.speed.y += step * gravity;
-  var motion = new Vector(0, this.speed.y * step);
-  var newPos = this.pos.plus(motion);
-  var obstacle = level.obstacleAt(newPos, this.size);
-  if (obstacle) {
-	if (keys.up && this.speed.y > 0) 
-		this.speed.y = -jumpSpeed;
-	else 
-		this.speed.y = 0;
-  } else {
-	  this.pos = newPos;
-  }
-};
-
-  Level.prototype.playerTouched = function(type, actor) {
-  if (type == "lava" && this.status == null) {
-    this.status = "lost";
-    this.finishDelay = 1;
-  } 
-};
-
-function runGame(plans, Display) {
-  function startLevel(n) {
-    runLevel(new Level(plans[n]), Display, function(status) {
-      if (status == "lost")
-        startLevel(n);
-      else if (n < plans.length - 1)
-        startLevel(n + 1);
-      else
-        console.log("You win!");
-    });
-  }
-  startLevel(0);
-}
-
-Player.prototype.act = function(step, level, keys) {
-  this.moveX(step, level, keys);
-  this.moveY(step, level, keys);
-};
-
-
-
-
 // Arrow key codes for readibility
 var arrowCodes = {37: "left", 38: "up", 39: "right", 40: "down"};
 
 // Translate the codes pressed from a key event
 function trackKeys(codes) {
   var pressed = Object.create(null);
-  
-  
-
 
   // alters the current "pressed" array which is returned from this function. 
   // The "pressed" variable persists even after this function terminates
@@ -318,7 +192,42 @@ function runAnimation(frameFunc) {
   }
   requestAnimationFrame(frame);
 }
+var maxStep = 0.5;
+Level.prototype.animate = function(step, keys) {
+	while (step > 0) {
+		var thisStep = Math.min(step, maxStep);
+		this.player.act(thisStep, this, keys);
+		step = thisStep;
+	}
+}
 
+var playerSpeed = 7;
+Player.prototype.movex = function(step, level, keys) {
+	this.speed.x = 0;
+	if (keys.left)
+		this.speed.x -= playerXSpeed;
+	if (keys.right)
+		this.speed.x += playerXSpeed;
+	var motion = new Vector(this.speed.x * step, 0);
+	var newPos = this.pos.plus(motion);
+	this.pos = newPos;
+};
+
+//Placeholder Code
+Player.prototype.moveY = function(step, level, keys) {
+	this.speed.y = 0;
+	if (keys.up)
+		this.speed.y += playerYSpeed;
+	if (keys.down)
+		this.speed.y -= playerYSpeed;
+	var motion = new Vector(this.speed.y * step, 0);
+	var newPos = this.pos.plus(motion);
+	this.pos = newPos;
+}
+Player.prototype.act = function(step,level,keys) {
+	this.moveX(step, level, keys);
+	this.moveY(step, level, keys);
+};
 // This assigns the array that will be updated anytime the player
 // presses an arrow key. We can access it from anywhere.
 var arrows = trackKeys(arrowCodes);
@@ -329,21 +238,16 @@ function runLevel(level, Display) {
 
   runAnimation(function(step) {
     // Allow the viewer to scroll the level
-    level.animate(step, arrows);
-    display.drawFrame(step);
+    level.animate(step,arrows);
+	display.drawFrame(step);
   });
 }
 
 function runGame(plans, Display) {
   function startLevel(n) {
-    runLevel(new Level(plans[n]), Display, function(status) {
-      if (status == "lost")
-        startLevel(n);
-      else if (n < plans.length - 1)
-        startLevel(n + 1);
-      else
-        console.log("You win!");
-    });
+    // Create a new level using the nth element of array plans
+    // Pass in a reference to Display function, DOMDisplay (in index.html).
+    runLevel(new Level(plans[n]), Display);
   }
   startLevel(0);
 }
