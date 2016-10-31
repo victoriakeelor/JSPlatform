@@ -8,7 +8,7 @@
 
 .actor { position: absolute; }
 .player { background: green; }
-
+.enemy { background: purple;}
 
 .game {
   overflow: hidden;
